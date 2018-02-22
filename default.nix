@@ -48,7 +48,7 @@ let
 
     mkl = callPackage ./mkl { };
 
-    openmpi-ilp64 = callPackage ./openmpi { ILP64=true; };
+    openmpi-ilp64 = callPackage ./openmpi { gfortran=gfortran-ilp64; };
 
     openmpi = callPackage ./openmpi { };
 
@@ -67,6 +67,28 @@ let
     slurmSpankX11 = pkgs.slurmSpankX11; # make X11 work in srun sessions
 
     ucx = callPackage ./ucx { };
+
+    # nix-wrappers
+    gfortran-ilp64 = with pkgs; stdenv.mkDerivation  {
+      name = "gfortran-ilp64";
+      nativeBuildInputs = [ makeWrapper ];
+      buildInputs = [ gfortran ];
+      propagatedBuildInputs = [ gfortran.lib ];
+
+      buildCommand = ''
+        mkdir -p $out/bin
+        makeWrapper ${gfortran}/bin/g77 $out/bin/g77 --add-flags -fdefault-integer-8
+        makeWrapper ${gfortran}/bin/f77 $out/bin/f77 --add-flags -fdefault-integer-8
+        makeWrapper ${gfortran}/bin/gfortran $out/bin/gfortran --add-flags -fdefault-integer-8
+      '';
+    };
+
+    fortranPackages = gfc : {
+      openblas = appendToName "${gfc.name}" (pkgs.openblas.override { gfortran=gfc; });
+    };
+
+    gf64 = fortranPackages gfortran-ilp64;
+    gf32 = fortranPackages gfortran;
   };
 
 in pkgs-qc
