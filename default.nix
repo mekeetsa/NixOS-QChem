@@ -1,6 +1,7 @@
 let
   # prefer 18.03-pre (master branch)
-  pkgs = import (fetchTarball http://nixos.org/channels/nixos-unstable/nixexprs.tar.xz) {};
+  #pkgs = import (fetchTarball http://nixos.org/channels/nixos-unstable/nixexprs.tar.xz) {};
+  pkgs = import /home/markus/src/nixpkgs {};
 
   callPackage = pkgs.lib.callPackageWith (pkgs // pkgs-qc);
 
@@ -69,19 +70,40 @@ let
     ucx = callPackage ./ucx { };
 
     # nix-wrappers
-    gfortran-ilp64 = with pkgs; stdenv.mkDerivation  {
-      name = "gfortran-ilp64";
-      nativeBuildInputs = [ makeWrapper ];
-      buildInputs = [ gfortran ];
-      propagatedBuildInputs = [ gfortran.lib ];
+    wrapFCWith = { name ? "", cc, bintools, libc, extraFFlags ? "", extraPackages ? [], extraBuildCommands ? "" }:
+        ccWrapperFun rec {
+      nativeTools = targetPlatform == hostPlatform && stdenv.cc.nativeTools or false;
+      nativeLibc = targetPlatform == hostPlatform && stdenv.cc.nativeLibc or false;
+      nativePrefix = stdenv.cc.nativePrefix or "";
+      noLibc = !nativeLibc && (libc == null);
 
-      buildCommand = ''
-        mkdir -p $out/bin
-        makeWrapper ${gfortran}/bin/g77 $out/bin/g77 --add-flags -fdefault-integer-8
-        makeWrapper ${gfortran}/bin/f77 $out/bin/f77 --add-flags -fdefault-integer-8
-        makeWrapper ${gfortran}/bin/gfortran $out/bin/gfortran --add-flags -fdefault-integer-8
-      '';
+      isGNU = cc.isGNU or false;
+      isClang = cc.isClang or false;
+
+      inherit name cc bintools libc extraBuildCommands extraPackages extraFFlags;
     };
+
+
+    wrapFC = cc: wrapFCWith {
+      name = lib.optionalString (targetPlatform != hostPlatform) "gcc-cross-wrapper";
+      inherit cc;
+      # This should be the only bintools runtime dep with this sort of logic. The
+      # Others should instead delegate to the next stage's choice with
+      # `targetPackages.stdenv.cc.bintools`. This one is different just to
+      # provide the default choice, avoiding infinite recursion.
+      bintools = if targetPlatform.isDarwin then darwin.binutils else binutils;
+      libc = if targetPlatform != hostPlatform then libcCross else stdenv.cc.libc;
+
+      extraFFlags = "-fdefault-integer-8";
+    };
+
+    gfortran-ilp64 = wrapFC (gcc7.cc.override {
+      name = "gfortran-ilp64";
+      langFortran = true;
+      langCC = false;
+      langC = false;
+      profiledCompiler = false;
+    });
 
     fortranPackages = gfc : {
       openblas = appendToName "${gfc.name}" (pkgs.openblas.override { gfortran=gfc; });
