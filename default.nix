@@ -31,7 +31,8 @@ let
     cp2k = callPackage ./cp2k {
       mpi=pkg;
       scalapack=MPI.scalapack;
-      fftw=self.fftwOpt;
+      # fftw=self.fftwOpt; # Modified by MK:
+      fftw = if cfg.optAVX then self.fftwOpt else self.fftwOMP;
       optAVX = cfg.optAVX;
     };
 
@@ -183,6 +184,15 @@ in with super;
   })
   else
     super.fftw;
+
+  # Added by MK, BEGIN
+  fftwOMP = 
+    fftw.overrideDerivation ( oldAttrs: {
+    configureFlags = oldAttrs.configureFlags
+      ++ [ "--enable-openmp" "--enable-threads" ];
+    buildInputs = [ self.gfortran ];
+  });
+  # Added by MK, END
 
   # For molcas and chemps2
   hdf5-full = hdf5.override {
