@@ -46,7 +46,7 @@ in (openmolcas.override {
         --prefix PATH : "${chemps2}/bin"
   '';
 
-  doInstallCheck = true;
+  doInstallCheck = false; # Disabled by MK
 
   installCheckPhase = ''
      #

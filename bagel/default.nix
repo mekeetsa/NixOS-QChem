@@ -84,7 +84,7 @@ in stdenv.mkDerivation {
     grep "99.847790" log
   '';
 
-  doInstallCheck = true;
+  doInstallCheck = false;
 
   doCheck = true;
 
